@@ -162,10 +162,10 @@ $(function () {
             schema: {
                 model: {
                     fields: {
-                        lendDate: { type: "string" },
-                        bookKeeperId: { type: "string" },
-                        bookKeeperEname: { type: "string" },
-                        bookKeeperCname: { type: "string" }
+                        LendDate: { type: "string" },
+                        BookKeeperId: { type: "string" },
+                        BookKeeperEname: { type: "string" },
+                        BookKeeperCname: { type: "string" }
                     }
                 }
             },
@@ -191,10 +191,9 @@ $(function () {
  * 當圖書類別改變時,置換圖片
  */
 function onClassChange() {
-    var selectedValue = $("#book_class_d").data("kendoDropDownList") ? 
-        $("#book_class_d").data("kendoDropDownList").value() : "";
+    var selectedValue = "DB";
 
-    if(selectedValue==="" || selectedValue==null){
+    if(selectedValue===""){
         $("#book_image_d").attr("src", "image/optional.jpg");
     }else{
         $("#book_image_d").attr("src", "image/" + selectedValue + ".jpg");
@@ -210,22 +209,52 @@ function onBookWindowClose() {
 }
 
 function addBook() { 
+    // 取得圖書類別 (支援 Kendo DropDownList 或一般 select)
+    var classWidget = $("#book_class_d").data("kendoDropDownList");
+    var bookClassId = classWidget ? classWidget.value() : $("#book_class_d").val();
+    var bookClassName = classWidget ? classWidget.text() : $("#book_class_d option:selected").text();
+
+    // 更新圖片顯示
+    if (!bookClassId) {
+        $("#book_image_d").attr("src", "image/optional.jpg");
+    } else {
+        $("#book_image_d").attr("src", "image/" + bookClassId + ".jpg");
+    }
+
+    // 取得並格式化購買日期為 yyyy-MM-dd
+    var dp = $("#book_bought_date_d").data("kendoDatePicker");
+    var boughtDate = dp ? kendo.toString(dp.value(), "yyyy-MM-dd") : $("#book_bought_date_d").val();
+
+    // 必填欄位檢查（額外保險檢查，因為按鈕已經由 kendoValidator 初步驗證）
+    var missing = [];
+    if (!bookClassId) missing.push("圖書類別");
+    if (!$("#book_name_d").val()) missing.push("書名");
+    if (!boughtDate) missing.push("購買日期");
+    if (!$("#book_author_d").val()) missing.push("作者");
+    if (!$("#book_publisher_d").val()) missing.push("出版商");
+    if (!$("#book_note_d").val()) missing.push("內容簡介");
+
+    if (missing.length > 0) {
+        alert("以下欄位為必填：\n" + missing.join("\n"));
+        return;
+    }
 
     var book = {
-        //TODO: 補齊欄位值
         "BookName": $("#book_name_d").val(),
-        "BookClassId": "",
-        "BookClassName": "",
-        "BookBoughtDate": $("#book_bought_date_d").val(),
-        "BookStatusId": $("#book_status_d").data("kendoDropDownList").value(),
-        "BookStatusName": "",
+        "BookClassId": bookClassId,
+        "BookClassName": bookClassName,
+        // 存入 Table 時日期使用 年-月-日 格式
+        "BookBoughtDate": boughtDate,
+        // 儲存時使用預設值
+        "BookStatusId": "A",
+        "BookStatusName": "可以借出",
         "BookKeeperId": "",
         "BookKeeperCname": "",
         "BookKeeperEname": "",
         "BookAuthor": $("#book_author_d").val(),
         "BookPublisher": $("#book_publisher_d").val(),
         "BookNote": $("#book_note_d").val()
-    }
+    };
 
     $.ajax({
         type: "post",
@@ -234,21 +263,152 @@ function addBook() {
         contentType: "application/json",
         dataType: "json",
         success: function (response) {
+            // 若 API 回傳 Status 欄位則以之為準
+            if (response && response.Status === false) {
+                alert(response.message || "新增失敗");
+                return;
+            }
+
+            // 重新讀取 Grid 資料
+            try{
+                var grid = getBooGrid();
+                if(grid) grid.dataSource.read();
+            }catch(e){}
+
             alert("新增成功");
             $("#book_detail_area").data("kendoWindow").close();
+        },
+        error: function(xhr){
+            alert(xhr.responseText || "新增失敗");
         }
     });
     
  }
 
 function updateBook(bookId){
-    
-    //TODO: 取得畫面上相關書籍資料
-    var book={
-        "":""
+    // 取得畫面上相關書籍資料
+    var id = $("#book_id_d").val() || bookId;
+
+    // 圖書類別
+    var classWidget = $("#book_class_d").data("kendoDropDownList");
+    var bookClassId = classWidget ? classWidget.value() : $("#book_class_d").val();
+    var bookClassName = classWidget ? classWidget.text() : $("#book_class_d option:selected").text();
+
+    // 更新圖片顯示
+    if (!bookClassId) {
+        $("#book_image_d").attr("src", "image/optional.jpg");
+    } else {
+        $("#book_image_d").attr("src", "image/" + bookClassId + ".jpg");
     }
-   
- }
+
+    // 購買日期
+    var dp = $("#book_bought_date_d").data("kendoDatePicker");
+    var boughtDate = dp ? kendo.toString(dp.value(), "yyyy-MM-dd") : $("#book_bought_date_d").val();
+
+    // 借閱狀態
+    var statusWidget = $("#book_status_d").data("kendoDropDownList");
+    var bookStatusId = statusWidget ? statusWidget.value() : $("#book_status_d").val();
+    var bookStatusName = statusWidget ? statusWidget.text() : $("#book_status_d option:selected").text();
+
+    // 借閱人
+    var keeperWidget = $("#book_keeper_d").data("kendoDropDownList");
+    var bookKeeperId = keeperWidget ? keeperWidget.value() : $("#book_keeper_d").val();
+    var bookKeeperCname = keeperWidget ? keeperWidget.text() : $("#book_keeper_d option:selected").text();
+    var bookKeeperEname = "";
+
+    // 其他欄位
+    var bookName = $("#book_name_d").val();
+    var bookAuthor = $("#book_author_d").val();
+    var bookPublisher = $("#book_publisher_d").val();
+    var bookNote = $("#book_note_d").val();
+
+    // 必填欄位檢查
+    var missing = [];
+    if (!bookClassId) missing.push("圖書類別");
+    if (!bookName) missing.push("書名");
+    if (!boughtDate) missing.push("購買日期");
+    if (!bookAuthor) missing.push("作者");
+    if (!bookPublisher) missing.push("出版商");
+    if (!bookNote) missing.push("內容簡介");
+
+    // 若借閱狀態為「已借出」或含有「借出」字樣，則借閱人為必填
+    var statusText = bookStatusName || "";
+    if (statusText.indexOf("借出") >= 0) {
+        if (!bookKeeperId && !bookKeeperCname) missing.push("借閱人");
+    }
+
+    if (missing.length > 0) {
+        alert("以下欄位為必填：\n" + missing.join("\n"));
+        return;
+    }
+
+    var book = {
+        "BookId": id,
+        "BookName": bookName,
+        "BookClassId": bookClassId,
+        "BookClassName": bookClassName,
+        "BookBoughtDate": boughtDate,
+        "BookStatusId": bookStatusId,
+        "BookStatusName": bookStatusName,
+        "BookKeeperId": bookKeeperId || "",
+        "BookKeeperCname": bookKeeperCname || "",
+        "BookKeeperEname": bookKeeperEname || "",
+        "BookAuthor": bookAuthor,
+        "BookPublisher": bookPublisher,
+        "BookNote": bookNote
+    };
+
+    // 更新書籍
+    $.ajax({
+        type: "post",
+        url: apiRootUrl+"bookmaintain/updatebook",
+        data: JSON.stringify(book),
+        contentType: "application/json",
+        dataType: "json",
+        success: function (response) {
+            if (response && response.Status === false) {
+                alert(response.message || "更新失敗");
+                return;
+            }
+
+            // 若狀態為借出相關，則新增借閱紀錄（以狀態文字判斷是否含「借出」）
+            if (statusText.indexOf("借出") >= 0) {
+                var lend = {
+                    "BookId": id,
+                    "BookKeeperId": bookKeeperId || "",
+                    "BookKeeperCname": bookKeeperCname || "",
+                    "BookKeeperEname": bookKeeperEname || "",
+                    "LendDate": kendo.toString(new Date(), "yyyy-MM-dd")
+                };
+
+                // 嘗試呼叫新增借閱紀錄 API（若不存在，忽略錯誤）
+                $.ajax({
+                    type: "post",
+                    url: apiRootUrl+"bookmaintain/addlendrecord",
+                    data: JSON.stringify(lend),
+                    contentType: "application/json",
+                    dataType: "json",
+                    success: function(resp){
+                        // 不強制處理回應
+                    },
+                    error: function(){}
+                });
+            }
+
+            // 重新讀取 Grid 並關閉視窗
+            try{
+                var grid = getBooGrid();
+                if(grid) grid.dataSource.read();
+            }catch(e){}
+
+            alert("更新成功");
+            $("#book_detail_area").data("kendoWindow").close();
+        },
+        error: function(xhr){
+            alert(xhr.responseText || "更新失敗");
+        }
+    });
+}
 
 function deleteBook(e) {
     e.preventDefault();
@@ -372,11 +532,8 @@ function bindBook(bookId){
             //TODO: 補齊要綁的資料
             $("#book_id_d").val(book.bookId);
             $("#book_name_d").val(book.bookName);
-            $("#book_class_d").data("kendoDropDownList").value(book.bookClassId);
-            $("#book_bought_date_d").data("kendoDatePicker").value(new Date(book.bookBoughtDate));
-            $("#book_author_d").val(book.bookAuthor);
-            $("#book_publisher_d").val(book.bookPublisher);
-            $("#book_note_d").val(book.bookNote);
+
+            $("#book_status_d").data("kendoDropDownList").value(book.bookStatusId);
 
             onClassChange();
         },error:function(xhr){
@@ -392,24 +549,16 @@ function showBookLendRecord(e) {
     
     var grid = getBooGrid();
     var row = grid.dataItem(e.target.closest("tr"));
-    var bookId = row.bookId;
-    var bookName = row.bookName;
 
+    //row.bookId
     //TODO: 完成發 AJAX 和處理後續動作
     $.ajax({
-        type: "post",
-        url: apiRootUrl+"bookmaintain/querylendrecord",
-        data: JSON.stringify(bookId),
-        contentType: "application/json",
-        dataType: "json",
+        type: "method",
+        url: "url",
+        data: "data",
+        dataType: "dataType",
         success: function (response) {
-            var recordGrid = $("#book_record_grid").data("kendoGrid");
-            recordGrid.dataSource.data(response.data);
-            
-            $("#book_record_area").data("kendoWindow").title(bookName+"借閱紀錄").open();
-        },
-        error: function(xhr){
-            alert(xhr.responseText);
+            //$("#book_record_area").data("kendoWindow").title(bookName+"借閱紀錄").open();
         }
     });    
 }
@@ -517,7 +666,7 @@ function registerRegularComponent(){
     //TODO: 其他的下拉選單
 
     $("#book_bought_date_d").kendoDatePicker({
-        format: "yyyy/MM/dd",
+        format: "yyyy-MM-dd",
         value: new Date(),
         dateInput: true
     });
