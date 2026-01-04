@@ -83,8 +83,6 @@ $(function () {
 
         clear(areaOption.query);
         //TODO: 清空後重新查詢
-        var grid = getBooGrid();
-        grid.dataSource.read();
     });
 
     $("#btn-save").click(function (e) {
@@ -112,12 +110,11 @@ $(function () {
                   type: "post",
                   data: function(){
                     return {
-                        "BookName": $("#book_name_q").val(),
-                        // TODO: 補齊傳入參數
-                        // 若為 Kendo DropDownList 則使用其 value()，否則使用原生 val()
-                        "BookClassId": ($("#book_class_q").data("kendoDropDownList") ? $("#book_class_q").data("kendoDropDownList").value() : $("#book_class_q").val()),
-                        "BookKeeperId": ($("#book_keeper_q").data("kendoDropDownList") ? $("#book_keeper_q").data("kendoDropDownList").value() : $("#book_keeper_q").val()),
-                        "BookStatusId": $("#book_status_q").data("kendoDropDownList").value()
+                        "BookName":$("#book_name_q").val(),
+                        //TODO: 補齊傳入參數
+                        "BookClassId":"",
+                        "BookKeeperId":"",
+                        "BookStatusId":$("#book_status_q").data("kendoDropDownList").value()
                     }
                   }
                 }
@@ -405,108 +402,174 @@ function showBookLendRecord(e) {
     });    
 }
 
+//TODO:補齊要清空的欄位
 function clear(area) {
-    //TODO:補齊要清空的欄位
     switch (area) {
         case "q":
             $("#book_name_q").val("");
-            $("#book_status_q").data("kendoDropDownList").select(0);
+            // 重置查詢區的下拉選單
+            var statusDropQ = $("#book_status_q").data("kendoDropDownList");
+            if(statusDropQ) statusDropQ.select(0);
+            
+            var classDropQ = $("#book_class_q").data("kendoDropDownList");
+            if(classDropQ) classDropQ.select(0);
+            
+            var keeperDropQ = $("#book_keeper_q").data("kendoDropDownList");
+            if(keeperDropQ) keeperDropQ.select(0);
             break;
     
         case "d":
+            //清空文字欄位
+            $("#book_id_d").val("");
             $("#book_name_d").val("");
             $("#book_author_d").val("");
             $("#book_publisher_d").val("");
             $("#book_note_d").val("");
-            onClassChange();
-            //清除驗證訊息
-            $("#book_detail_area").kendoValidator().data("kendoValidator").reset();
+
+            //重置下拉選單
+            var classDrop = $("#book_class_d").data("kendoDropDownList");
+            if(classDrop) classDrop.select(0);
+
+            var statusDrop = $("#book_status_d").data("kendoDropDownList");
+            //預設狀態設為 A (可以借出)
+            if(statusDrop) statusDrop.value("A"); 
+
+            var keeperDrop = $("#book_keeper_d").data("kendoDropDownList");
+            //狀態為 A 時，借閱人應該清空
+            if(keeperDrop) keeperDrop.value("");
+
+            //重置日期 (預設今天)
+            var datePicker = $("#book_bought_date_d").data("kendoDatePicker");
+            if(datePicker) datePicker.value(new Date());
+
+            //更新圖片與清除驗證訊息
+            $("#book_image_d").attr("src", "image/optional.jpg");
+            
+            var validator = $("#book_detail_area").data("kendoValidator");
+            if (validator) validator.hideMessages();
             break;
         default:
             break;
     }
 }
                       
+// TODO: 確認選項關聯呈現方式                      
 function setStatusKeepRelation() { 
-    // TODO: 確認選項關聯呈現方式
+    //取得下拉選單物件
+    var statusDropDown = $("#book_status_d").data("kendoDropDownList");
+    var keeperDropDown = $("#book_keeper_d").data("kendoDropDownList");
+
+    //防呆
+    if (!statusDropDown || !keeperDropDown) return;
+
+    var bookStatusId = statusDropDown.value();
+
     switch (state) {
         case "add":
-            $("#book_status_d_col").css("display","none");
-            $("#book_keeper_d_col").css("display","none");
-        
-            $("#book_status_d").prop('required',false);
-            $("#book_keeper_d").prop('required',false);            
+            //新增模式：隱藏欄位
+            $("#book_status_d_col").hide();
+            $("#book_keeper_d_col").hide();
+            
+            $("#book_status_d").prop('required', false);
+            $("#book_keeper_d").prop('required', false);            
             break;
+
         case "update":
-            $("#book_status_d_col").css("display","");
-            $("#book_keeper_d_col").css("display","");
-            $("#book_status_d").prop('required',true);
+            //修改模式：顯示欄位
+            $("#book_status_d_col").show();
+            $("#book_keeper_d_col").show();
+            
+            $("#book_status_d").prop('required', true);
 
-            var bookStatusId=
-                $("#book_status_d").data("kendoDropDownList").value();
-
-            if(bookStatusId=="A" || bookStatusId=="U"){
-                $("#book_keeper_d").prop('required',false);
-
-                $("#book_detail_area").data("kendoValidator").validateInput($("#book_keeper_d"));
-
-                $("#book_keeper_d_label").removeClass("required");
+            //邏輯判斷：B(已借出) 或 C(已借出未領) -> 借閱人必填且可選
+            if (bookStatusId == "B" || bookStatusId == "C") {
+                keeperDropDown.enable(true);                // 啟用
+                $("#book_keeper_d").prop('required', true); // 必填
+                $("#book_keeper_d").closest(".form-group").find("label").addClass("required");
+            } else {
+                keeperDropDown.value("");                   // 清空
+                keeperDropDown.enable(false);               // 鎖定
+                $("#book_keeper_d").prop('required', false);// 免填
+                $("#book_keeper_d").closest(".form-group").find("label").removeClass("required");
                 
-            }else{
-                $("#book_keeper_d").prop('required',true);
-                $("#book_keeper_d_label").addClass("required");
+                //消除紅字
+                var validator = $("#book_detail_area").data("kendoValidator");
+                if (validator) validator.hideMessages();
             }
             break;
         default:
             break;
     }
-    
- }
+}
 
- /**
-  * 生成畫面上的 Kendo 控制項
-  */
+//TODO: 其他的下拉選單
+/**
+ * 生成畫面上的 Kendo 控制項
+ */
 function registerRegularComponent(){
     
+    //查詢區 (Query) 下拉選單 ---
+
+    //借閱狀態
     $("#book_status_q").kendoDropDownList({
-        dataTextField: "text",
-        dataValueField: "value",
+        dataTextField: "StatusText",
+        dataValueField: "StatusId",
+        dataSource: bookStatusData,
         optionLabel: "請選擇",
-        index: 0,        
-        dataSource: {
-            schema:{
-                data:"data"
-            },
-            transport: {
-                read: {
-                    dataType: "json",
-                    type:"post",
-                    url: apiRootUrl+"code/bookstatus",
-                }
-            }
-        }
+        index: 0
     });
 
+    //圖書類別
+    $("#book_class_q").kendoDropDownList({
+        dataTextField: "text",
+        dataValueField: "value",
+        dataSource: classData,
+        optionLabel: "請選擇",
+        index: 0
+    });
+
+    //借閱人
+    $("#book_keeper_q").kendoDropDownList({
+        dataTextField: "UserCname",
+        dataValueField: "UserId",
+        dataSource: memberData,
+        optionLabel: "請選擇",
+        index: 0
+    });
+
+
+    //編輯區 (Detail/新增視窗) 下拉選單
+
+    //借閱狀態 (新增 change 事件以觸發連動)
     $("#book_status_d").kendoDropDownList({
+        dataTextField: "StatusText",
+        dataValueField: "StatusId",
+        dataSource: bookStatusData,
+        optionLabel: "請選擇",
+        index: 0,
+        change: setStatusKeepRelation // 設定連動
+    });
+
+    //圖書類別
+    $("#book_class_d").kendoDropDownList({
         dataTextField: "text",
         dataValueField: "value",
+        dataSource: classData,
         optionLabel: "請選擇",
-        index: 0,        
-        dataSource: {
-            schema:{
-                data:"data"
-            },
-            transport: {
-                read: {
-                    dataType: "json",
-                    type:"post",
-                    url: apiRootUrl+"code/bookstatus",
-                }
-            }
-        }
+        index: 0,
+        change: onClassChange       // 設定換圖
     });
-    //TODO: 其他的下拉選單
 
+    //借閱人
+    $("#book_keeper_d").kendoDropDownList({
+        dataTextField: "UserCname",
+        dataValueField: "UserId",
+        dataSource: memberData,
+        optionLabel: "請選擇",
+        index: 0
+    });
+
+    //日期選擇器
     $("#book_bought_date_d").kendoDatePicker({
         format: "yyyy-MM-dd",
         value: new Date(),
