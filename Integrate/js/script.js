@@ -3,7 +3,7 @@ var areaOption={
     "detail":"d"
 }
 
-var apiRootUrl="http://localhost:5191/api/";
+var apiRootUrl="https://localhost:7246/api/";
 var state="";
 
 var stateOption={
@@ -71,274 +71,93 @@ $(function () {
     });
 
 
-        $("#btn_query").click(function (e) {
+    $("#btn_query").click(function (e) {
+        e.preventDefault();
+        
+        var grid=getBooGrid();
+        grid.dataSource.read();
+    });
 
+    $("#btn_clear").click(function (e) {
+        e.preventDefault();
 
-            e.preventDefault();
+        clear(areaOption.query);
+        //TODO: 清空後重新查詢
+        var grid = getBooGrid();
+        grid.dataSource.read();
+    });
 
-
-            var grid = getBooGrid();
-
-
-            grid.dataSource.read();
-
-
-        });
-
-
-    
-
-
-        $("#btn_clear").click(function (e) {
-
-
-            e.preventDefault();
-
-
-    
-
-
-            clear(areaOption.query);
-
-
-            var grid = getBooGrid();
-
-
-            grid.dataSource.data([]);
-
-
-        });
-
-
-    
-
-
-        $("#btn-save").click(function (e) {
-
-
-            e.preventDefault();
-
-
-            if (validator.validate()) {
-
-
-                switch (state) {
-
-
-                    case "add":
-
-
-                        addBook();
-
-
-                        break;
-
-
-                    case "update":
-
-
-                        updateBook($("#book_id_d").val());
-
-
+    $("#btn-save").click(function (e) {
+        e.preventDefault();
+        if (validator.validate()) {
+            switch (state) {
+                case "add":
+                    addBook();
                     break;
-
-
-                    default:
-
-
-                        break;
-
-
-                }
-
-
+                case "update":
+                    updateBook($("#book_id_d").val());
+                break;
+                default:
+                    break;
             }
+        }        
+    });
 
-
-        });
-
-
-    
-
-
-            $("#book_grid").kendoGrid({
-
-
-    
-
-
-                dataSource: {
-
-
-                transport: {
-
-
-                    read: {
-
-
-                      url: apiRootUrl + "bookmaintain/querybook",
-
-
-                      dataType: "json",
-
-
-                      type: "post",
-
-
-                      contentType: "application/json"
-
-
-                    },
-
-
-                    parameterMap: function(data, type) {
-
-
-                        if (type === "read") {
-
-
-                            // Gather parameters from the form
-
-
-                            var params = {
-
-
-                                "BookId": 0,
-
-
-                                "BookName": $("#book_name_q").val(),
-
-
-                                "BookClassId": $("#book_class_q").data("kendoDropDownList") ? $("#book_class_q").data("kendoDropDownList").value() : "",
-
-
-                                "BookKeeperId": $("#book_keeper_q").data("kendoDropDownList") ? $("#book_keeper_q").data("kendoDropDownList").value() : "",
-
-
-                                "BookStatusId": $("#book_status_q").data("kendoDropDownList") ? $("#book_status_q").data("kendoDropDownList").value() : ""
-
-
-                            };
-
-
-                            return JSON.stringify(params);
-
-
-                        }
-
-
-                        return JSON.stringify(data);
-
-
+    $("#book_grid").kendoGrid({
+        dataSource: {
+            transport: {
+                read: {
+                  url: apiRootUrl+"bookmaintain/querybook",
+                  dataType: "json",
+                  type: "post",
+                  data: function(){
+                    return {
+                        "BookName": $("#book_name_q").val(),
+                        // TODO: 補齊傳入參數
+                        // 若為 Kendo DropDownList 則使用其 value()，否則使用原生 val()
+                        "BookClassId": ($("#book_class_q").data("kendoDropDownList") ? $("#book_class_q").data("kendoDropDownList").value() : $("#book_class_q").val()),
+                        "BookKeeperId": ($("#book_keeper_q").data("kendoDropDownList") ? $("#book_keeper_q").data("kendoDropDownList").value() : $("#book_keeper_q").val()),
+                        "BookStatusId": $("#book_status_q").data("kendoDropDownList").value()
                     }
-
-
-                },
-
-
-                schema: {
-
-
-                    model: {
-
-
-                        fields: {
-
-
-                            bookId: { type: "int" },
-
-
-                            bookClassName: { type: "string" },
-
-
-                            bookName: { type: "string" },
-
-
-                            bookBoughtDate: { type: "string" },
-
-
-                            bookStatusName: { type: "string" },
-
-
-                            bookKeeperCname: { type: "string" }
-
-
-                        }
-
-
+                  }
+                }
+            },
+            schema: {
+                 model: {
+                    fields: {
+                        bookId: { type: "int" },
+                        bookClassName: { type: "string" },
+                        bookName: { type: "string" },
+                        bookBoughtDate: { type: "string" },
+                        bookStatusName: { type: "string" },
+                        bookKeeperCname: { type: "string" }
                     }
-
-
-                },
-
-
-                serverPaging: false,
-
-
-                pageSize: 20,
-
-
+                }
             },
-
-
-            height: 550,
-
-
-            sortable: true,
-
-
-            pageable: {
-
-
-                input: true,
-
-
-                numeric: false
-
-
+            serverPaging: false,
+            pageSize: 20,
+        },
+        height: 550,
+        sortable: true,
+        pageable: {
+            input: true,
+            numeric: false
+        },
+        columns: [
+            { field: "bookId", title: "書籍編號", width: "10%" },
+            { field: "bookClassName", title: "圖書類別", width: "15%" },
+            { field: "bookName", title: "書名", width: "30%" ,
+              template: "<a style='cursor:pointer; color:blue' onclick='showBookForDetail(event,#:bookId #)'>#: bookName #</a>"
             },
+            { field: "bookBoughtDate", title: "購書日期", width: "15%" },
+            { field: "bookStatusName", title: "借閱狀態", width: "15%" },
+            { field: "bookKeeperCname", title: "借閱人", width: "15%" },
+            { command: { text: "借閱紀錄", click: showBookLendRecord }, title: " ", width: "120px" },
+            { command: { text: "修改", click: showBookForUpdate }, title: " ", width: "100px" },
+            { command: { text: "刪除", click: deleteBook }, title: " ", width: "100px" }
+        ]
 
-
-            columns: [
-
-
-                { field: "bookId", title: "書籍編號", width: "10%" },
-
-
-                { field: "bookClassName", title: "圖書類別", width: "15%" },
-
-
-                { field: "bookName", title: "書名", width: "30%" ,
-
-
-                  template: "<a style='cursor:pointer; color:blue' onclick='showBookForDetail(event,#:bookId #)'>#: bookName #</a>"
-
-
-                },
-
-
-                { field: "bookBoughtDate", title: "購書日期", width: "15%" },
-
-
-                { field: "bookStatusName", title: "借閱狀態", width: "15%" },
-
-
-                { field: "bookKeeperCname", title: "借閱人", width: "15%" },
-
-
-                { command: { text: "借閱紀錄", click: showBookLendRecord }, title: " ", width: "120px" },
-
-
-                { command: { text: "修改", click: showBookForUpdate }, title: " ", width: "100px" },
-
-
-                { command: { text: "刪除", click: deleteBook }, title: " ", width: "100px" }
-
-
-            ]
-
-
-        });
+    });
 
     $("#book_record_grid").kendoGrid({
         dataSource: {
