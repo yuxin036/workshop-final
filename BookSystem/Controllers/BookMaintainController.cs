@@ -66,61 +66,111 @@ namespace BookSystem.Controllers
         }
 
         [HttpPost()]
-        [Route("loadbook")]
-        public IActionResult GetBookById([FromBody]int bookId)
+        [HttpGet("loadbook/{bookId}")]
+        public IActionResult GetBookById([FromRoute] int bookId)
         {
             try
             {
                 BookService bookService = new BookService();
+                var book = bookService.GetBookById(bookId);
                 ApiResult<Book> result = new ApiResult<Book>
                 {
-                    //TODO:明細畫面結果
-                    Data = new Book() { 
-                        BookId=9999,
-                        BookName="Test"
-                    },
+                    Data = book,
                     Status = true,
                     Message = string.Empty
                 };
 
                 return Ok(result);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-
-                return Problem();
+                return Problem(ex.Message);
             }
         }
         //TODO:UpdateBook()
+        [HttpPost("updatebook")]
+        public IActionResult UpdateBook([FromBody] Book book)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    BookService bookService = new BookService();
+                    bookService.UpdateBook(book);
+                    return Ok(new ApiResult<string>()
+                    {
+                        Data = string.Empty,
+                        Status = true,
+                        Message = string.Empty
+                    });
+                }
+                else
+                {
+                    return BadRequest(ModelState);
+                }
+            }
+            catch (Exception ex)
+            {
+                return Problem(ex.Message);
+            }
+        }
 
 
 
-        [HttpPost()]
-        [Route("deletebook")]
-        public IActionResult DeleteBookById([FromBody] int bookId)
+        [HttpDelete("deletebook/{bookId}")]
+        public IActionResult DeleteBookById([FromRoute] int bookId)
         {
             try
             {
                 BookService bookService = new BookService();
+                
+                // Simple check: for this example, we assume a book with a keeper cannot be deleted.
+                var book = bookService.GetBookById(bookId);
+                if (book != null && !string.IsNullOrEmpty(book.BookKeeperId))
+                {
+                    return Ok(new ApiResult<string>
+                    {
+                        Data = string.Empty,
+                        Status = false,
+                        Message = "該書已借出，不可刪除。"
+                    });
+                }
 
-                ApiResult<string> result = new ApiResult<string>
+                bookService.DeleteBookById(bookId);
+
+                return Ok(new ApiResult<string>
                 {
                     Data = string.Empty,
                     Status = true,
                     Message = string.Empty
-                };
-
-                //TODO:書籍刪除前檢查
-                //if book cannot result.Message = "該書已借出不可刪除"..
-                //else bookService.DeleteBookById(bookId);
-
-                return Ok(result);
+                });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return Problem();
+                return Problem(ex.Message);
             }
         }
         //TODO:booklendrecord
+        [HttpPost("querylendrecord")]
+        public IActionResult QueryLendRecord([FromBody] int bookId)
+        {
+            try
+            {
+                BookService bookService = new BookService();
+                var records = bookService.GetLendRecordByBookId(bookId);
+                var result = new ApiResult<List<BookLendRecord>>()
+                {
+                    Data = records,
+                    Status = true,
+                    Message = string.Empty
+                };
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                // Log the exception
+                return Problem(ex.Message);
+            }
+        }
     }
 }

@@ -129,42 +129,62 @@ namespace BookSystem.Model
         {
             using (SqlConnection conn = new SqlConnection(GetDBConnectionString()))
             {
-                try
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
                 {
-                    //TODO:Update SQL
-                    string sql = @"";
-
-                    Dictionary<string, Object> parameter = new Dictionary<string, object>();
-                    parameter.Add("@BOOK_NAME", book.BookName);
-                    parameter.Add("@BOOK_CLASS_ID", book.BookClassId);
-                    parameter.Add("@BOOK_AUTHOR", book.BookAuthor);
-                    parameter.Add("@BOOK_BOUGHT_DATE", book.BookBoughtDate);
-                    parameter.Add("@BOOK_PUBLISHER", book.BookPublisher);
-                    parameter.Add("@BOOK_NOTE", book.BookNote);
-                    parameter.Add("@BOOK_STATUS", book.BookStatusId);
-                    parameter.Add("@BOOK_KEEPER", book.BookKeeperId);
-                    parameter.Add("BOOK_ID", book.BookId);
-
-                    conn.Execute(sql, parameter);
-
-                    if (book.BookStatusId == "B" || book.BookStatusId == "C")
+                    try
                     {
-                        sql = @"
-                                Insert Into BOOK_LEND_RECORD
-                                (
-                                    BOOK_ID,KEEPER_ID,LEND_DATE,
-                                    CRE_DATE,CRE_USR,MOD_DATE,MOD_USR
-                                )
-                                ";
-                        parameter.Clear();
-                        parameter.Add("@BOOK_ID", book.BookId);
+                        string sql = @"
+                            UPDATE BOOK_DATA
+                            SET BOOK_NAME = @BookName,
+                                BOOK_CLASS_ID = @BookClassId,
+                                BOOK_AUTHOR = @BookAuthor,
+                                BOOK_BOUGHT_DATE = @BookBoughtDate,
+                                BOOK_PUBLISHER = @BookPublisher,
+                                BOOK_NOTE = @BookNote,
+                                BOOK_STATUS = @BookStatusId,
+                                BOOK_KEEPER = @BookKeeperId,
+                                MODIFY_DATE = GETDATE(),
+                                MODIFY_USER = 'Admin'
+                            WHERE BOOK_ID = @BookId";
 
-                        conn.Execute(sql, parameter);
+                        conn.Execute(sql, new 
+                        {
+                            book.BookName,
+                            book.BookClassId,
+                            book.BookAuthor,
+                            book.BookBoughtDate,
+                            book.BookPublisher,
+                            book.BookNote,
+                            book.BookStatusId,
+                            book.BookKeeperId,
+                            book.BookId
+                        }, transaction);
+
+                        if (book.BookStatusId == "B" || book.BookStatusId == "C")
+                        {
+                            sql = @"
+                                INSERT INTO BOOK_LEND_RECORD
+                                (
+                                    BOOK_ID, KEEPER_ID, LEND_DATE,
+                                    CRE_DATE, CRE_USR, MOD_DATE, MOD_USR
+                                )
+                                VALUES
+                                (
+                                    @BookId, @KeeperId, GETDATE(),
+                                    GETDATE(), 'Admin', GETDATE(), 'Admin'
+                                )";
+                            
+                            conn.Execute(sql, new { BookId = book.BookId, KeeperId = book.BookKeeperId }, transaction);
+                        }
+                        
+                        transaction.Commit();
                     }
-                }
-                catch (Exception)
-                {
-                    throw;
+                    catch (Exception)
+                    {
+                        transaction.Rollback();
+                        throw;
+                    }
                 }
             }
         }
@@ -179,6 +199,51 @@ namespace BookSystem.Model
                 parameter.Add("BOOK_ID", bookId);
 
                 conn.Execute(sql, parameter);
+            }
+        }
+
+        public List<BookLendRecord> GetLendRecordByBookId(int bookId)
+        {
+            var result = new List<BookLendRecord>();
+            using (SqlConnection conn = new SqlConnection(GetDBConnectionString()))
+            {
+                string sql = @"
+                    SELECT 
+                        b.USER_ID AS BookKeeperId,
+                        b.USER_CNAME AS BookKeeperCname,
+                        b.USER_ENAME AS BookKeeperEname,
+                        CONVERT(varchar(10), a.LEND_DATE, 120) AS LendDate
+                    FROM BOOK_LEND_RECORD a
+                    JOIN MEMBER_M b ON a.KEEPER_ID = b.USER_ID
+                    WHERE a.BOOK_ID = @BookId
+                    ORDER BY a.LEND_DATE DESC";
+
+                var parameters = new { BookId = bookId };
+                result = conn.Query<BookLendRecord>(sql, parameters).ToList();
+            }
+            return result;
+        }
+
+        public Book GetBookById(int bookId)
+        {
+            using (SqlConnection conn = new SqlConnection(GetDBConnectionString()))
+            {
+                string sql = @"
+                    Select 
+	                    A.BOOK_ID As BookId,A.BOOK_NAME As BookName,
+	                    A.BOOK_CLASS_ID As BookClassId,B.BOOK_CLASS_NAME As BookClassName,
+                        A.BOOK_STATUS As BookStatusId, C.CODE_NAME As BookStatusName,
+                        A.BOOK_KEEPER As BookKeeperId, D.USER_CNAME As BookKeeperCname, D.USER_ENAME As BookKeeperEname,
+	                    Convert(VarChar(10),A.BOOK_BOUGHT_DATE,120) As BookBoughtDate,
+                        A.BOOK_AUTHOR As BookAuthor, A.BOOK_PUBLISHER As BookPublisher, A.BOOK_NOTE As BookNote
+                    From BOOK_DATA As A
+	                    Inner Join BOOK_CLASS As B On A.BOOK_CLASS_ID=B.BOOK_CLASS_ID
+	                    Left Join BOOK_CODE As C On A.BOOK_STATUS=C.CODE_ID And C.CODE_TYPE = 'BOOK_STATUS'
+                        Left Join MEMBER_M As D On A.BOOK_KEEPER = D.USER_ID
+                    Where A.BOOK_ID = @BookId";
+
+                var parameters = new { BookId = bookId };
+                return conn.QueryFirstOrDefault<Book>(sql, parameters);
             }
         }
     }

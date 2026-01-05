@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "nnlzJY1wbDw=",
+  "dgSpecHash": "QK54H7xhLSk=",
   "success": true,
-  "projectFilePath": "C:\\Users\\user\\Desktop\\Integrate (1)\\BookSystem\\BookSystem.csproj",
+  "projectFilePath": "C:\\Users\\user\\Desktop\\library\\workshop-final\\BookSystem\\BookSystem.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\user\\.nuget\\packages\\azure.core\\1.47.1\\azure.core.1.47.1.nupkg.sha512",
     "C:\\Users\\user\\.nuget\\packages\\azure.identity\\1.14.2\\azure.identity.1.14.2.nupkg.sha512",

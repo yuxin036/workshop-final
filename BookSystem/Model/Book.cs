@@ -15,11 +15,9 @@ namespace BookSystem.Model
 
         [Required(ErrorMessage = "購買日期不可空白")]
         public string? BookBoughtDate { get; set; }
-        [Required(ErrorMessage = "借閱狀態不可空白")]
         public string? BookStatusId { get; set; }
         public string? BookStatusName { get; set; }
 
-        [Required(ErrorMessage = "借閱人不可空白")]
         public string? BookKeeperId { get; set; }
         public string? BookKeeperCname { get; set; }
         public string? BookKeeperEname { get; set; }
