@@ -18,9 +18,9 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()    // ¤¹³\©Ò¦³¨Ó·½
-              .AllowAnyMethod()    // ¤¹³\©Ò¦³ HTTP ¤èªk (GET, POST, PUT, DELETE...)
-              .AllowAnyHeader();   // ¤¹³\©Ò¦³ Header
+        policy.AllowAnyOrigin()    // ï¿½ï¿½ï¿½\ï¿½Ò¦ï¿½ï¿½Ó·ï¿½
+              .AllowAnyMethod()    // ï¿½ï¿½ï¿½\ï¿½Ò¦ï¿½ HTTP ï¿½ï¿½k (GET, POST, PUT, DELETE...)
+              .AllowAnyHeader();   // ï¿½ï¿½ï¿½\ï¿½Ò¦ï¿½ Header
     });
 });
 
@@ -33,7 +33,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
